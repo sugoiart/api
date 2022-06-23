@@ -1,15 +1,19 @@
 package main
 
 import (
-	"art-api/src/routes"
+	"fmt"
 	"log"
 	"net/http"
-	"github.com/julienschmidt/httprouter"
+	"os"
+	"art-api/src/routes"
 	_ "github.com/joho/godotenv/autoload"
+	"github.com/julienschmidt/httprouter"
 )
 
 func main() {
+	port := os.Getenv("PORT")
 	router := httprouter.New()
 	routes.InitRoutes(router)
-	log.Fatal(http.ListenAndServe(":8080", router))
+	fmt.Println("Server is running on port: " + port)
+	log.Fatal(http.ListenAndServe(":" + port, router))
 }
