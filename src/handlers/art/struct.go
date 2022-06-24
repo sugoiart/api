@@ -1,5 +1,10 @@
 package art
 
+type IndexResponse struct {
+	Status int `json:"status"`
+	Message string `json:"message"`
+}
+
 type RandomArt struct {
 	Url string `json:"url"`
 	Sha string `json:"sha"`
