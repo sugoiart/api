@@ -9,6 +9,7 @@ type RandomArt struct {
 	Url string `json:"url"`
 	Sha string `json:"sha"`
 	Status int `json:"status"`
+	Orientation string `json:"orientation"`
 }
 
 type GithubTree struct {
@@ -31,6 +32,7 @@ type AllArt struct {
 	Data []AllArtData `json:"data"`
 	Status int `json:"status"`
 	Sha string `json:"sha"`
+	Orientation string `json:"orientation"`
 }
 
 type AllArtData struct {

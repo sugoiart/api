@@ -39,6 +39,7 @@ func RandomArtwork(orientation string) *RandomArt {
 		list = getArtOfOrientation(orientation)
 	} else {
 		list = githubresp.Tree
+		orientation = "any"
 	}
 
 	for {
@@ -47,7 +48,7 @@ func RandomArtwork(orientation string) *RandomArt {
 			url := "https://raw.githubusercontent.com/artmoe/art/master/" + random.Path
 			url = strings.ReplaceAll(url, " ", "%20")
 			sha := random.Sha
-			response = &RandomArt{Url: url, Status: 200, Sha: sha}
+			response = &RandomArt{Url: url, Status: 200, Sha: sha, Orientation: orientation}
 			break
 		}
 	}
