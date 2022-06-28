@@ -21,7 +21,7 @@ type GithubTree struct {
 type GithubTreeNode struct {
 	Path string `json:"path"`
 	Mode string `json:"mode"`
-	Type string `json:"type"`
+	Kind string `json:"type"`
 	Size int `json:"size"`
 	Sha string `json:"sha"`
 	Url string `json:"url"`
