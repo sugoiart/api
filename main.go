@@ -14,8 +14,6 @@ func main() {
 	port := os.Getenv("PORT")
 	router := httprouter.New()
 	routes.InitRoutes(router)
-	mux := http.NewServeMux()
-	routes.InitMainRoutes(mux, router)
 	fmt.Println("Server is running on port: " + port)
-	log.Fatal(http.ListenAndServe(":" + port, mux))
+	log.Fatal(http.ListenAndServe(":" + port, router))
 }
