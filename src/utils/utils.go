@@ -6,6 +6,7 @@ import (
 	"github.com/syumai/workers/cloudflare/fetch"
 	"log"
 	"net/http"
+	"path"
 )
 
 func RequestImages(url string, target interface{}, r *http.Request) error {
@@ -21,4 +22,9 @@ func RequestImages(url string, target interface{}, r *http.Request) error {
 		log.Fatalln(err2)
 	}
 	return json.NewDecoder(resp.Body).Decode(target)
+}
+
+func IsImageFile(p string) bool {
+	ext := path.Ext(p)
+	return ext == ".jpg" || ext == ".png" || ext == ".gif"
 }

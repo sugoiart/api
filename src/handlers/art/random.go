@@ -3,98 +3,71 @@ package art
 import (
 	"art-api/src/utils"
 	"encoding/json"
+	"errors"
 	"github.com/julienschmidt/httprouter"
+	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
+var ErrNoImagesFound = errors.New("no images found matching the criteria")
+
 func Random(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	orien := r.URL.Query()["o"]
-	var response *RandomArt
-	if len(orien) > 0 {
-		if orien[0] == "portrait" || orien[0] == "landscape" || orien[0] == "square" {
-			response = RandomArtwork(orien[0], r)
-		} else {
-			response = RandomArtwork("", r)
-		}
-	} else {
-		response = RandomArtwork("", r)
-	}
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
-	err := json.NewEncoder(w).Encode(response)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func RandomArtwork(orientation string, r *http.Request) *RandomArt {
-	var response *RandomArt
-	githubresp := GithubTree{}
-	utils.RequestImages(
-		"https://api.github.com/repos/artmoe/art/git/trees/master?recursive=1",
-		&githubresp,
-		r,
-	)
-
-	var list []GithubTreeNode
-	if orientation != "" {
-		list = getArtOfOrientation(orientation, r)
-	} else {
-		list = githubresp.Tree
+	orientation := r.URL.Query().Get("o")
+	if _, isValid := validOrientations[orientation]; !isValid {
 		orientation = "any"
 	}
 
-	for {
-		random := list[rand.Intn(len(list))]
-		if (random.Kind == "blob") &&
-			(strings.HasSuffix(random.Path, ".jpg") || strings.HasSuffix(random.Path, ".png") || strings.HasSuffix(random.Path, ".gif")) {
-			url := "https://raw.githubusercontent.com/artmoe/art/master/" + random.Path
-			url = strings.ReplaceAll(url, " ", "%20")
-			sha := random.Sha
-			response = &RandomArt{Url: url, Status: 200, Sha: sha, Orientation: orientation}
-			break
+	response, err := getRandomArt(r, orientation)
+	if err != nil {
+		log.Printf("Error getting random art: %v", err)
+		if errors.Is(err, ErrNoImagesFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
+		return
 	}
 
-	return response
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to write response: %v", err)
+	}
 }
 
-func getArtOfOrientation(orientation string, r *http.Request) []GithubTreeNode {
-	var list []GithubTreeNode
-	githubresp := GithubTree{}
-	utils.RequestImages(
-		"https://api.github.com/repos/artmoe/art/git/trees/master?recursive=1",
-		&githubresp,
-		r,
-	)
-
-	for _, s := range githubresp.Tree {
-		if strings.Contains(s.Path, "/"+orientation+"/") {
-			if (s.Kind == "blob") &&
-				(strings.HasSuffix(s.Path, ".jpg") || strings.HasSuffix(s.Path, ".png") || strings.HasSuffix(s.Path, ".gif")) {
-				url := "https://raw.githubusercontent.com/artmoe/art/master/" + s.Path
-				url = strings.ReplaceAll(url, " ", "%20")
-				path := s.Path
-				sha := s.Sha
-				mode := s.Mode
-				kind := s.Kind
-				size := s.Size
-				list = append(
-					list,
-					GithubTreeNode{
-						Path: path,
-						Mode: mode,
-						Kind: kind,
-						Sha:  sha,
-						Size: size,
-						Url:  url,
-					},
-				)
-			}
-		}
+func getRandomArt(r *http.Request, orientation string) (*RandomArt, error) {
+	var githubResp GithubTree
+	if err := utils.RequestImages(GITHUB_API_URL, &githubResp, r); err != nil {
+		return nil, err
 	}
 
-	return list
+	imageNodes := make([]GithubTreeNode, 0)
+	for _, node := range githubResp.Tree {
+		if node.Kind != "blob" || !utils.IsImageFile(node.Path) {
+			continue
+		}
+		if orientation != "any" && !strings.Contains(node.Path, "/"+orientation+"/") {
+			continue
+		}
+		imageNodes = append(imageNodes, node)
+	}
+
+	if len(imageNodes) == 0 {
+		return nil, ErrNoImagesFound
+	}
+
+	randomNode := imageNodes[rand.Intn(len(imageNodes))]
+
+	escapedPath := url.PathEscape(randomNode.Path)
+	fullURL := RAW_CONTENT_BASE_URL + escapedPath
+
+	return &RandomArt{
+		Url:         fullURL,
+		Status:      http.StatusOK,
+		Sha:         randomNode.Sha,
+		Orientation: orientation,
+	}, nil
 }

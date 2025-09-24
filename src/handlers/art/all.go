@@ -4,74 +4,59 @@ import (
 	"art-api/src/utils"
 	"encoding/json"
 	"github.com/julienschmidt/httprouter"
+	"log"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
 func All(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	orien := r.URL.Query()["o"]
-	var response *AllArt
-	if len(orien) > 0 {
-		if orien[0] == "portrait" || orien[0] == "landscape" || orien[0] == "square" {
-			response = getAllArtOfOrientation(orien[0], r)
-		} else {
-			response = AllArtwork(r)
-		}
-	} else {
-		response = AllArtwork(r)
+	orientation := r.URL.Query().Get("o")
+	if _, isValid := validOrientations[orientation]; !isValid {
+		orientation = "any"
 	}
+
+	response, err := getArt(r, orientation)
+	if err != nil {
+		log.Printf("Failed to get art: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
-	err := json.NewEncoder(w).Encode(response)
-	if err != nil {
-		panic(err)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to write response: %v", err)
 	}
 }
 
-func AllArtwork(r *http.Request) *AllArt {
-	githubresp := GithubTree{}
-	utils.RequestImages(
-		"https://api.github.com/repos/sugoiart/art/git/trees/master?recursive=1",
-		&githubresp,
-		r,
-	)
-	response := &AllArt{Data: []AllArtData{}, Status: 200, Sha: githubresp.Sha, Orientation: "any"}
-	for _, node := range githubresp.Tree {
-		if (node.Kind == "blob") &&
-			(strings.HasSuffix(node.Path, ".jpg") || strings.HasSuffix(node.Path, ".png") || strings.HasSuffix(node.Path, ".gif")) {
-			url := "https://raw.githubusercontent.com/sugoiart/art/master/" + node.Path
-			url = strings.ReplaceAll(url, " ", "%20")
-			response.Data = append(response.Data, AllArtData{Url: url, Sha: node.Sha})
+func getArt(r *http.Request, orientation string) (*AllArt, error) {
+	var githubResp GithubTree
+	if err := utils.RequestImages(GITHUB_API_URL, &githubResp, r); err != nil {
+		return nil, err
+	}
+
+	artData := make([]AllArtData, 0, len(githubResp.Tree)/2)
+
+	for _, node := range githubResp.Tree {
+		if node.Kind != "blob" || !utils.IsImageFile(node.Path) {
+			continue
 		}
+
+		if orientation != "any" && !strings.Contains(node.Path, "/"+orientation+"/") {
+			continue
+		}
+
+		escapedPath := url.PathEscape(node.Path)
+		fullURL := RAW_CONTENT_BASE_URL + escapedPath
+
+		artData = append(artData, AllArtData{Url: fullURL, Sha: node.Sha})
 	}
 
-	return response
-}
-
-func getAllArtOfOrientation(orientation string, r *http.Request) *AllArt {
-	githubresp := GithubTree{}
-	utils.RequestImages(
-		"https://api.github.com/repos/sugoiart/art/git/trees/master?recursive=1",
-		&githubresp,
-		r,
-	)
-	response := &AllArt{
-		Data:        []AllArtData{},
-		Status:      200,
-		Sha:         githubresp.Sha,
+	return &AllArt{
+		Data:        artData,
+		Status:      http.StatusOK,
+		Sha:         githubResp.Sha,
 		Orientation: orientation,
-	}
-	for _, s := range githubresp.Tree {
-		if strings.Contains(s.Path, "/"+orientation+"/") {
-			if (s.Kind == "blob") &&
-				(strings.HasSuffix(s.Path, ".jpg") || strings.HasSuffix(s.Path, ".png") || strings.HasSuffix(s.Path, ".gif")) {
-				url := "https://raw.githubusercontent.com/sugoiart/art/master/" + s.Path
-				url = strings.ReplaceAll(url, " ", "%20")
-				sha := s.Sha
-				response.Data = append(response.Data, AllArtData{Url: url, Sha: sha})
-			}
-		}
-	}
-
-	return response
+	}, nil
 }
