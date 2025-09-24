@@ -13,12 +13,12 @@ func All(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var response *AllArt
 	if len(orien) > 0 {
 		if orien[0] == "portrait" || orien[0] == "landscape" || orien[0] == "square" {
-			response = getAllArtOfOrientation(orien[0])
+			response = getAllArtOfOrientation(orien[0], r)
 		} else {
-			response = AllArtwork()
+			response = AllArtwork(r)
 		}
 	} else {
-		response = AllArtwork()
+		response = AllArtwork(r)
 	}
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
@@ -28,11 +28,12 @@ func All(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	}
 }
 
-func AllArtwork() *AllArt {
+func AllArtwork(r *http.Request) *AllArt {
 	githubresp := GithubTree{}
 	utils.RequestImages(
 		"https://api.github.com/repos/sugoiart/art/git/trees/master?recursive=1",
 		&githubresp,
+		r,
 	)
 	response := &AllArt{Data: []AllArtData{}, Status: 200, Sha: githubresp.Sha, Orientation: "any"}
 	for _, node := range githubresp.Tree {
@@ -47,11 +48,12 @@ func AllArtwork() *AllArt {
 	return response
 }
 
-func getAllArtOfOrientation(orientation string) *AllArt {
+func getAllArtOfOrientation(orientation string, r *http.Request) *AllArt {
 	githubresp := GithubTree{}
 	utils.RequestImages(
 		"https://api.github.com/repos/sugoiart/art/git/trees/master?recursive=1",
 		&githubresp,
+		r,
 	)
 	response := &AllArt{
 		Data:        []AllArtData{},
@@ -73,4 +75,3 @@ func getAllArtOfOrientation(orientation string) *AllArt {
 
 	return response
 }
-

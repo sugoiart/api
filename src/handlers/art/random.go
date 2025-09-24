@@ -14,12 +14,12 @@ func Random(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var response *RandomArt
 	if len(orien) > 0 {
 		if orien[0] == "portrait" || orien[0] == "landscape" || orien[0] == "square" {
-			response = RandomArtwork(orien[0])
+			response = RandomArtwork(orien[0], r)
 		} else {
-			response = RandomArtwork("")
+			response = RandomArtwork("", r)
 		}
 	} else {
-		response = RandomArtwork("")
+		response = RandomArtwork("", r)
 	}
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
@@ -29,17 +29,18 @@ func Random(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	}
 }
 
-func RandomArtwork(orientation string) *RandomArt {
+func RandomArtwork(orientation string, r *http.Request) *RandomArt {
 	var response *RandomArt
 	githubresp := GithubTree{}
 	utils.RequestImages(
 		"https://api.github.com/repos/artmoe/art/git/trees/master?recursive=1",
 		&githubresp,
+		r,
 	)
 
 	var list []GithubTreeNode
 	if orientation != "" {
-		list = getArtOfOrientation(orientation)
+		list = getArtOfOrientation(orientation, r)
 	} else {
 		list = githubresp.Tree
 		orientation = "any"
@@ -60,12 +61,13 @@ func RandomArtwork(orientation string) *RandomArt {
 	return response
 }
 
-func getArtOfOrientation(orientation string) []GithubTreeNode {
+func getArtOfOrientation(orientation string, r *http.Request) []GithubTreeNode {
 	var list []GithubTreeNode
 	githubresp := GithubTree{}
 	utils.RequestImages(
 		"https://api.github.com/repos/artmoe/art/git/trees/master?recursive=1",
 		&githubresp,
+		r,
 	)
 
 	for _, s := range githubresp.Tree {
@@ -96,4 +98,3 @@ func getArtOfOrientation(orientation string) []GithubTreeNode {
 
 	return list
 }
-
