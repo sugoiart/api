@@ -51,3 +51,15 @@ type AllArtData struct {
 	Sha string `json:"sha"`
 }
 
+type ArtDetail struct {
+	Url    string `json:"url"`
+	Sha    string `json:"sha"`
+	Path   string `json:"path"`
+	Status int    `json:"status"`
+}
+
+type ArtStats struct {
+	TotalImages   int            `json:"totalImages"`
+	LastUpdateSha string         `json:"lastUpdateSha"`
+	Orientations  map[string]int `json:"orientations"`
+}
