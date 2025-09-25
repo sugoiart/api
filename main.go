@@ -11,5 +11,10 @@ func main() {
 	router := httprouter.New()
 	routes.InitRoutes(router)
 
-	workers.Serve(http.HandlerFunc(router.ServeHTTP))
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		router.ServeHTTP(w, r)
+	})
+
+	workers.Serve(handler)
 }
