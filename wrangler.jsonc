@@ -7,7 +7,7 @@
   },
   "kv_namespaces": [
     {
-      "binding": "art-kv",
+      "binding": "ART_KV",
       "id": "76e08592c643434bad9d8ae843502d09"
     }
   ]

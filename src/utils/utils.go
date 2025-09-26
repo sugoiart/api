@@ -21,7 +21,7 @@ func RequestArtJson(r *http.Request, kvBinding, cacheKey, url string, ttl time.D
 	}
 
 	cachedString, err := store.GetString(cacheKey, nil)
-	if err == nil && cachedString != "" {
+	if err == nil && cachedString != "" && cachedString != "<null>" {
 		return json.Unmarshal([]byte(cachedString), target)
 	}
 

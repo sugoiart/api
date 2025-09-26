@@ -5,7 +5,7 @@ import "time"
 const (
 	GITHUB_API_URL            = "https://api.github.com/repos/sugoiart/art/git/trees/master?recursive=1"
 	RAW_CONTENT_BASE_URL      = "https://raw.githubusercontent.com/sugoiart/art/master/"
-	ART_KV_BINDING            = "art-kv"
+	ART_KV_BINDING            = "ART_KV"
 	GITHUB_ART_TREE_CACHE_KEY = "artmoe_art_tree"
 	CACHE_TTL                 = 1 * time.Hour
 )
