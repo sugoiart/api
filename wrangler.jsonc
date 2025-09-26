@@ -4,5 +4,11 @@
   "compatibility_date": "2024-06-10",
   "build": {
     "command": "npm run build"
-  }
+  },
+  "kv_namespaces": [
+    {
+      "binding": "art-kv",
+      "id": "76e08592c643434bad9d8ae843502d09"
+    }
+  ]
 }

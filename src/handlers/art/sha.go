@@ -40,7 +40,15 @@ func BySHA(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
 func getArtBySHA(r *http.Request, sha string) (*ArtDetail, error) {
 	var githubResp GithubTree
-	if err := utils.RequestImages(GITHUB_API_URL, &githubResp, r); err != nil {
+	err := utils.RequestArtJson(
+		r,
+		ART_KV_BINDING,
+		GITHUB_ART_TREE_CACHE_KEY,
+		GITHUB_API_URL,
+		CACHE_TTL,
+		&githubResp,
+	)
+	if err != nil {
 		return nil, err
 	}
 

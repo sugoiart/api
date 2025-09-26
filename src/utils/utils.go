@@ -1,79 +1,74 @@
 package utils
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/syumai/workers/cloudflare"
-	"github.com/syumai/workers/cloudflare/cache"
-	"github.com/syumai/workers/cloudflare/fetch"
-	"io"
 	"log"
 	"net/http"
 	"path"
 	"time"
+
+	"github.com/syumai/workers/cloudflare"
+	"github.com/syumai/workers/cloudflare/fetch"
+	"github.com/syumai/workers/cloudflare/kv"
 )
 
-func RequestImages(url string, target interface{}, r *http.Request) error {
-	cacheKeyReq, err := http.NewRequestWithContext(r.Context(), http.MethodGet, url, nil)
+func RequestArtJson(r *http.Request, kvBinding, cacheKey, url string, ttl time.Duration, target interface{}) error {
+	store, err := kv.NewNamespace(kvBinding)
 	if err != nil {
-		return fmt.Errorf("failed to create cache key request: %w", err)
+		return fmt.Errorf("failed to open KV namespace '%s': %w", kvBinding, err)
 	}
 
-	c := cache.New()
-
-	cachedResp, err := c.Match(cacheKeyReq, nil)
-	if err == nil && cachedResp != nil {
-		defer cachedResp.Body.Close()
-		return json.NewDecoder(cachedResp.Body).Decode(target)
+	cachedString, err := store.GetString(cacheKey, nil)
+	if err == nil && cachedString != "" {
+		return json.Unmarshal([]byte(cachedString), target)
 	}
 
-	cli := fetch.NewClient()
-	backendReq, err := fetch.NewRequest(r.Context(), http.MethodGet, url, nil)
+	log.Printf("KV Miss for key '%s'. Fetching fresh data from %s.", cacheKey, url)
+	if err := fetchFromGithub(r.Context(), url, target); err != nil {
+		return fmt.Errorf("failed to fetch from origin: %w", err)
+	}
+
+	freshBytes, err := json.Marshal(target)
 	if err != nil {
-		log.Printf("Error creating new fetch request: %v", err)
-		return err
-	}
-
-	backendReq.Header.Add("User-Agent", "jckli-worker")
-	backendReq.Header.Add("Authorization", "token "+cloudflare.Getenv("GITHUB_TOKEN"))
-
-	backendResp, err := cli.Do(backendReq, nil)
-	if err != nil {
-		log.Printf("Error performing fetch request: %v", err)
-		return err
-	}
-	defer backendResp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(backendResp.Body)
-	if err != nil {
-		log.Printf("Error reading response body: %v", err)
-		return err
-	}
-
-	if err := json.Unmarshal(bodyBytes, target); err != nil {
-		log.Printf("Error unmarshaling response body: %v", err)
-		return err
-	}
-
-	cacheableResp := &http.Response{
-		StatusCode: backendResp.StatusCode,
-		Header:     backendResp.Header.Clone(),
-		Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
-	}
-
-	if cacheableResp.Header.Get("Cache-Control") == "" {
-		cacheableResp.Header.Set("Cache-Control", fmt.Sprintf("max-age=%.0f", (1*time.Hour).Seconds()))
+		log.Printf("Failed to marshal fresh data for KV store (key: %s): %v", cacheKey, err)
+		return nil
 	}
 
 	cloudflare.WaitUntil(func() {
-		err := c.Put(cacheKeyReq, cacheableResp)
+		opts := &kv.PutOptions{
+			ExpirationTTL: int(ttl.Seconds()),
+		}
+		err := store.PutString(cacheKey, string(freshBytes), opts)
 		if err != nil {
-			log.Printf("Error putting response into cache: %v", err)
+			log.Printf("Failed to put data into KV (key: %s): %v", cacheKey, err)
 		}
 	})
 
 	return nil
+}
+
+func fetchFromGithub(ctx context.Context, url string, target interface{}) error {
+	cli := fetch.NewClient()
+	req, err := fetch.NewRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Add("User-Agent", "jckli-worker")
+	req.Header.Add("Authorization", "token "+cloudflare.Getenv("GITHUB_TOKEN"))
+
+	resp, err := cli.Do(req, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("github API returned non-200 status: %s", resp.Status)
+	}
+
+	return json.NewDecoder(resp.Body).Decode(target)
 }
 
 func IsImageFile(p string) bool {

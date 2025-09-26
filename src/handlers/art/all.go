@@ -32,7 +32,15 @@ func All(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 func getArt(r *http.Request, orientation string) (*AllArt, error) {
 	var githubResp GithubTree
-	if err := utils.RequestImages(GITHUB_API_URL, &githubResp, r); err != nil {
+	err := utils.RequestArtJson(
+		r,
+		ART_KV_BINDING,
+		GITHUB_ART_TREE_CACHE_KEY,
+		GITHUB_API_URL,
+		CACHE_TTL,
+		&githubResp,
+	)
+	if err != nil {
 		return nil, err
 	}
 
